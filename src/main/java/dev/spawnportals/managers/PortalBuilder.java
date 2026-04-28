@@ -8,7 +8,6 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.Sign;
 import org.bukkit.block.data.Orientable;
-import org.bukkit.block.data.type.NetherPortal;
 import org.bukkit.block.sign.Side;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -67,9 +66,9 @@ public class PortalBuilder {
                     // interno: NETHER_PORTAL orientato lungo X
                     block.setType(Material.NETHER_PORTAL);
                     var bd = block.getBlockData();
-                    if (bd instanceof NetherPortal np) {
-                        np.setAxis(org.bukkit.Axis.X);
-                        block.setBlockData(np);
+                    if (bd instanceof Orientable orientable) {
+                        orientable.setAxis(org.bukkit.Axis.X);
+                        block.setBlockData(orientable);
                     }
                 }
             }
