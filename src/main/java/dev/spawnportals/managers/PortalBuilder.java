@@ -7,150 +7,127 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.Sign;
-import org.bukkit.block.data.BlockData;
-import org.bukkit.block.data.type.WallSign;
+import org.bukkit.block.data.Orientable;
+import org.bukkit.block.data.type.NetherPortal;
 import org.bukkit.block.sign.Side;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 
 /**
- * Builds a vertical Nether-portal-like structure for each portal type.
+ * Schema portale (WIDTH=4, HEIGHT=5):
  *
- * Schema (width=4, height=5, facing North/South):
+ *   [C][F][F][C]   top
+ *   [F][P][P][F]
+ *   [A][P][P][A]
+ *   [F][P][P][F]
+ *   [C][F][F][C]   bottom
  *
- *   [C][F][F][C]    <-- top row
- *   [F][L][L][F]    <-- inner rows (L = glass light)
- *   [A][L][L][A]
- *   [F][L][L][F]
- *   [C][F][F][C]    <-- bottom row
- *
- *  Above center top: Oak/Spruce wall sign
- *
- * C = corner, F = frame, A = accent, L = portal light glass
+ * C=corner, F=frame/accent alternati, A=accent, P=NETHER_PORTAL
+ * Il portale è orientato lungo X (asse X), cioè visibile da Nord/Sud.
  */
 public class PortalBuilder {
 
-    // Portal dimensions
-    public static final int WIDTH = 4;
+    public static final int WIDTH  = 4;
     public static final int HEIGHT = 5;
 
-    /**
-     * Builds the portal starting at the given bottom-left corner (min X, min Y, same Z).
-     * The portal is built along the X axis (East-West face).
-     */
     public static void buildPortal(Location origin, PortalType type) {
         World world = origin.getWorld();
 
-        Material corner = type.getCornerMaterial();
-        Material frame = type.getFrameMaterial();
-        Material accent = type.getAccentMaterial();
-        Material light = type.getPortalLightMaterial();
+        Material corner  = type.getCornerMaterial();
+        Material frame   = type.getFrameMaterial();
+        Material accent  = type.getAccentMaterial();
+        Material rare    = type.getRareMaterial();
 
         for (int y = 0; y < HEIGHT; y++) {
             for (int x = 0; x < WIDTH; x++) {
-                Location loc = origin.clone().add(x, y, 0);
-                Block block = world.getBlockAt(loc);
+                Block block = world.getBlockAt(
+                        origin.getBlockX() + x,
+                        origin.getBlockY() + y,
+                        origin.getBlockZ());
 
-                boolean isTopOrBottom = (y == 0 || y == HEIGHT - 1);
-                boolean isLeftOrRight = (x == 0 || x == WIDTH - 1);
-                boolean isCorner = isTopOrBottom && isLeftOrRight;
+                boolean isTop    = y == HEIGHT - 1;
+                boolean isBottom = y == 0;
+                boolean isLeft   = x == 0;
+                boolean isRight  = x == WIDTH - 1;
+                boolean isEdge   = isLeft || isRight;
+                boolean isHEdge  = isTop || isBottom;
+                boolean isCorner = isEdge && isHEdge;
+                boolean isInner  = !isEdge && !isHEdge;
 
-                Material mat;
                 if (isCorner) {
-                    mat = corner;
-                } else if (isTopOrBottom) {
-                    // Alternate frame and accent on top/bottom rows
-                    mat = (x % 2 == 0) ? frame : accent;
-                } else if (isLeftOrRight) {
-                    // Alternate frame and accent on sides
-                    mat = (y % 2 == 1) ? frame : accent;
-                } else {
-                    // Interior = portal light glass
-                    mat = light;
+                    block.setType(corner);
+                } else if (isHEdge) {
+                    // top/bottom row: alterna frame e rare per un effetto carino
+                    block.setType(x == 1 ? frame : rare);
+                } else if (isEdge) {
+                    // lati: alterna frame e accent
+                    block.setType(y % 2 == 1 ? frame : accent);
+                } else if (isInner) {
+                    // interno: NETHER_PORTAL orientato lungo X
+                    block.setType(Material.NETHER_PORTAL);
+                    var bd = block.getBlockData();
+                    if (bd instanceof NetherPortal np) {
+                        np.setAxis(org.bukkit.Axis.X);
+                        block.setBlockData(np);
+                    }
                 }
-
-                block.setType(mat);
             }
         }
 
-        // Place the sign above the portal, centered
         placeSign(origin, type, world);
     }
 
     private static void placeSign(Location origin, PortalType type, World world) {
-        // Center X of the 4-wide portal is between block 1 and 2, so use block 1
-        int signX = origin.getBlockX() + 1;
-        int signY = origin.getBlockY() + HEIGHT; // one block above the portal
-        int signZ = origin.getBlockZ();
+        // cartello sopra al centro (x+1, y+HEIGHT)
+        int sx = origin.getBlockX() + 1;
+        int sy = origin.getBlockY() + HEIGHT;
+        int sz = origin.getBlockZ();
 
-        Block signBlock = world.getBlockAt(signX, signY, signZ);
-
-        // Use oak sign as wall sign (hanging on south face since portal faces N/S)
-        // We need a block behind (north face) to attach — but portal top is there, so
-        // instead we place a sign on TOP of the portal top block at center.
-        // Place the sign on top of the top-center frame block.
-        Block topCenter = world.getBlockAt(signX, origin.getBlockY() + HEIGHT - 1, signZ);
-        Block above = topCenter.getRelative(BlockFace.UP);
+        Block above = world.getBlockAt(sx, sy, sz);
         above.setType(Material.OAK_SIGN);
 
-        BlockData bd = above.getBlockData();
+        var bd = above.getBlockData();
         if (bd instanceof org.bukkit.block.data.type.Sign signData) {
-            // Rotate sign to face East (so it's readable from front)
             signData.setRotation(BlockFace.SOUTH);
             above.setBlockData(signData);
         }
 
         if (above.getState() instanceof Sign sign) {
-            var sideFront = sign.getSide(Side.FRONT);
+            var front = sign.getSide(Side.FRONT);
 
-            Component title;
-            Component cmd;
-            NamedTextColor color;
+            NamedTextColor color = switch (type) {
+                case OVERWORLD -> NamedTextColor.GREEN;
+                case NETHER    -> NamedTextColor.RED;
+                case END       -> NamedTextColor.LIGHT_PURPLE;
+            };
+            String label = switch (type) {
+                case OVERWORLD -> "✦ OVERWORLD ✦";
+                case NETHER    -> "✦ NETHER ✦";
+                case END       -> "✦  END  ✦";
+            };
 
-            switch (type) {
-                case OVERWORLD -> {
-                    color = NamedTextColor.GREEN;
-                    title = Component.text("✦ OVERWORLD ✦", color, TextDecoration.BOLD);
-                    cmd = Component.text("/overworld", NamedTextColor.WHITE);
-                }
-                case NETHER -> {
-                    color = NamedTextColor.RED;
-                    title = Component.text("✦ NETHER ✦", color, TextDecoration.BOLD);
-                    cmd = Component.text("/nether", NamedTextColor.WHITE);
-                }
-                case END -> {
-                    color = NamedTextColor.GRAY;
-                    title = Component.text("✦ END ✦", color, TextDecoration.BOLD);
-                    cmd = Component.text("/end", NamedTextColor.WHITE);
-                }
-                default -> {
-                    color = NamedTextColor.WHITE;
-                    title = Component.text(type.getDisplayName());
-                    cmd = Component.text("/" + type.getId());
-                }
-            }
-
-            sideFront.line(0, Component.text(""));
-            sideFront.line(1, title);
-            sideFront.line(2, cmd);
-            sideFront.line(3, Component.text(""));
+            front.line(0, Component.text(""));
+            front.line(1, Component.text(label, color, TextDecoration.BOLD));
+            front.line(2, Component.text("Entra per teletrasportarti", NamedTextColor.WHITE));
+            front.line(3, Component.text(""));
             sign.update();
         }
     }
 
-    /**
-     * Removes the portal blocks (replaces with AIR) in a region.
-     */
     public static void removePortal(Location origin, int width, int height, World world) {
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
-                world.getBlockAt(origin.clone().add(x, y, 0)).setType(Material.AIR);
+                world.getBlockAt(
+                        origin.getBlockX() + x,
+                        origin.getBlockY() + y,
+                        origin.getBlockZ()).setType(Material.AIR);
             }
         }
-        // Also remove sign above
-        int signX = origin.getBlockX() + 1;
-        int signY = origin.getBlockY() + height;
-        world.getBlockAt(signX, signY, origin.getBlockZ()).setType(Material.AIR);
+        // rimuovi cartello
+        world.getBlockAt(
+                origin.getBlockX() + 1,
+                origin.getBlockY() + height,
+                origin.getBlockZ()).setType(Material.AIR);
     }
 }

@@ -7,15 +7,15 @@ public enum PortalType {
 
     OVERWORLD("overworld", "Overworld", Material.STONE_BRICKS, Material.MOSSY_STONE_BRICKS,
             Material.CRACKED_STONE_BRICKS, Material.CHISELED_STONE_BRICKS,
-            Material.LIME_STAINED_GLASS, World.Environment.NORMAL),
+            Material.NETHER_PORTAL, World.Environment.NORMAL),
 
     NETHER("nether", "Nether", Material.OBSIDIAN, Material.CRYING_OBSIDIAN,
             Material.BLACKSTONE, Material.GILDED_BLACKSTONE,
-            Material.RED_STAINED_GLASS, World.Environment.NETHER),
+            Material.NETHER_PORTAL, World.Environment.NETHER),
 
     END("end", "End", Material.END_STONE_BRICKS, Material.PURPUR_BLOCK,
             Material.PURPUR_PILLAR, Material.END_PORTAL_FRAME,
-            Material.GRAY_STAINED_GLASS, World.Environment.THE_END);
+            Material.NETHER_PORTAL, World.Environment.THE_END);
 
     private final String id;
     private final String displayName;
