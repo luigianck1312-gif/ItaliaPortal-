@@ -1,0 +1,32 @@
+name: SpawnPortals
+version: 1.0.0
+main: dev.spawnportals.SpawnPortals
+api-version: '1.21'
+description: Portali allo spawn per Overworld, Nether ed End con teletrasporto casuale
+authors: [SpawnPortals]
+
+commands:
+  portalwand:
+    description: Ottieni la bacchetta per selezionare il portale
+    usage: /portalwand
+    permission: spawnportals.admin
+  place:
+    description: Crea un portale nella selezione corrente
+    usage: /place <overworld|nether|end>
+    permission: spawnportals.admin
+  remove:
+    description: Rimuovi un portale
+    usage: /remove <overworld|nether|end>
+    permission: spawnportals.admin
+  portals:
+    description: Lista tutti i portali attivi
+    usage: /portals
+    permission: spawnportals.admin
+
+permissions:
+  spawnportals.admin:
+    description: Permesso per gestire i portali
+    default: op
+  spawnportals.use:
+    description: Permesso per usare i portali
+    default: true

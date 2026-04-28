@@ -1,0 +1,23 @@
+# SpawnPortals Configuration
+settings:
+  # Range del teletrasporto casuale (da -range a +range)
+  teleport-range: 30000
+  # Tempo di cooldown in secondi tra un teletrasporto e l'altro
+  teleport-cooldown: 5
+  # Altezza minima di sicurezza per il teletrasporto
+  min-safe-y: 60
+  # Tentativi massimi per trovare un posto sicuro
+  max-safe-attempts: 50
+
+messages:
+  no-permission: "&cNon hai il permesso!"
+  portal-placed: "&aPortale %type% creato con successo!"
+  portal-removed: "&cPortale %type% rimosso!"
+  portal-not-found: "&cNessun portale %type% trovato!"
+  no-selection: "&cDevi prima selezionare una regione con /portalwand!"
+  teleporting: "&aTeletrasporto in corso verso %world%..."
+  safe-spot-not-found: "&cNon riesco a trovare un posto sicuro, riprova!"
+  cooldown: "&cAspetta ancora %seconds% secondi prima di usare un portale!"
+  wand-given: "&aHai ricevuto la bacchetta portale! Click sinistro = primo angolo, Click destro = secondo angolo"
+
+portals: {}
