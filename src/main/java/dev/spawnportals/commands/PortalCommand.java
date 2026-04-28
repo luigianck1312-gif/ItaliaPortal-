@@ -24,6 +24,10 @@ public class PortalCommand implements CommandExecutor, TabCompleter {
     private final PortalManager portalManager;
     private final SelectionManager selectionManager;
 
+    private static final List<String> SUBCOMMANDS = List.of("wand", "place", "remove", "list");
+    private static final List<String> TYPES = Arrays.stream(PortalType.values())
+            .map(PortalType::getId).collect(Collectors.toList());
+
     public PortalCommand(SpawnPortals plugin) {
         this.plugin = plugin;
         this.portalManager = plugin.getPortalManager();
@@ -43,16 +47,28 @@ public class PortalCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        String cmdName = cmd.getName().toLowerCase();
+        if (args.length == 0) {
+            sendHelp(player);
+            return true;
+        }
 
-        switch (cmdName) {
-            case "portalwand" -> handleWand(player);
-            case "place" -> handlePlace(player, args);
+        switch (args[0].toLowerCase()) {
+            case "wand"   -> handleWand(player);
+            case "place"  -> handlePlace(player, args);
             case "remove" -> handleRemove(player, args);
-            case "portals" -> handleList(player);
+            case "list"   -> handleList(player);
+            default       -> sendHelp(player);
         }
 
         return true;
+    }
+
+    private void sendHelp(Player player) {
+        player.sendMessage(PortalManager.color("&6=== SpawnPortals ==="));
+        player.sendMessage(PortalManager.color("&e/portale wand &7- Prendi la bacchetta selezione"));
+        player.sendMessage(PortalManager.color("&e/portale place <overworld|nether|end> &7- Crea portale"));
+        player.sendMessage(PortalManager.color("&e/portale remove <overworld|nether|end> &7- Rimuovi portale"));
+        player.sendMessage(PortalManager.color("&e/portale list &7- Lista portali attivi"));
     }
 
     private void handleWand(Player player) {
@@ -60,16 +76,16 @@ public class PortalCommand implements CommandExecutor, TabCompleter {
         player.getInventory().addItem(wand);
         player.sendMessage(PortalManager.color(
                 plugin.getConfig().getString("messages.wand-given",
-                        "&aHai ricevuto la bacchetta portale!")));
+                        "&aHai ricevuto la bacchetta portale! &7Click SX = angolo 1, Click DX = angolo 2")));
     }
 
     private void handlePlace(Player player, String[] args) {
-        if (args.length < 1) {
-            player.sendMessage(PortalManager.color("&cUso: /place <overworld|nether|end>"));
+        if (args.length < 2) {
+            player.sendMessage(PortalManager.color("&cUso: /portale place <overworld|nether|end>"));
             return;
         }
 
-        PortalType type = PortalType.fromString(args[0]);
+        PortalType type = PortalType.fromString(args[1]);
         if (type == null) {
             player.sendMessage(PortalManager.color("&cTipo non valido! Usa: overworld, nether, end"));
             return;
@@ -78,14 +94,13 @@ public class PortalCommand implements CommandExecutor, TabCompleter {
         if (!selectionManager.hasFullSelection(player.getUniqueId())) {
             player.sendMessage(PortalManager.color(
                     plugin.getConfig().getString("messages.no-selection",
-                            "&cDevi prima selezionare una regione con /portalwand!")));
+                            "&cDevi prima selezionare una regione con &e/portale wand&c!")));
             return;
         }
 
         Location pos1 = selectionManager.getPos1(player.getUniqueId());
         Location pos2 = selectionManager.getPos2(player.getUniqueId());
 
-        // Build the visual portal at pos1 (bottom-left corner)
         Location buildOrigin = new Location(
                 pos1.getWorld(),
                 Math.min(pos1.getBlockX(), pos2.getBlockX()),
@@ -95,10 +110,8 @@ public class PortalCommand implements CommandExecutor, TabCompleter {
 
         PortalBuilder.buildPortal(buildOrigin, type);
 
-        // Register the region
         PortalRegion region = new PortalRegion(type, pos1, pos2);
         portalManager.registerPortal(region);
-
         selectionManager.clearSelection(player.getUniqueId());
 
         String msg = plugin.getConfig().getString("messages.portal-placed",
@@ -108,12 +121,12 @@ public class PortalCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleRemove(Player player, String[] args) {
-        if (args.length < 1) {
-            player.sendMessage(PortalManager.color("&cUso: /remove <overworld|nether|end>"));
+        if (args.length < 2) {
+            player.sendMessage(PortalManager.color("&cUso: /portale remove <overworld|nether|end>"));
             return;
         }
 
-        PortalType type = PortalType.fromString(args[0]);
+        PortalType type = PortalType.fromString(args[1]);
         if (type == null) {
             player.sendMessage(PortalManager.color("&cTipo non valido! Usa: overworld, nether, end"));
             return;
@@ -162,11 +175,13 @@ public class PortalCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command cmd, String label, String[] args) {
         if (args.length == 1) {
-            List<String> types = Arrays.stream(PortalType.values())
-                    .map(PortalType::getId)
+            return SUBCOMMANDS.stream()
+                    .filter(s -> s.startsWith(args[0].toLowerCase()))
                     .collect(Collectors.toList());
-            return types.stream()
-                    .filter(t -> t.startsWith(args[0].toLowerCase()))
+        }
+        if (args.length == 2 && (args[0].equalsIgnoreCase("place") || args[0].equalsIgnoreCase("remove"))) {
+            return TYPES.stream()
+                    .filter(t -> t.startsWith(args[1].toLowerCase()))
                     .collect(Collectors.toList());
         }
         return List.of();

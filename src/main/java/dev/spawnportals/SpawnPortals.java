@@ -30,12 +30,8 @@ public class SpawnPortals extends JavaPlugin {
 
         // Register commands
         var portalCmd = new PortalCommand(this);
-        getCommand("place").setExecutor(portalCmd);
-        getCommand("place").setTabCompleter(portalCmd);
-        getCommand("remove").setExecutor(portalCmd);
-        getCommand("remove").setTabCompleter(portalCmd);
-        getCommand("portalwand").setExecutor(portalCmd);
-        getCommand("portals").setExecutor(portalCmd);
+        getCommand("portale").setExecutor(portalCmd);
+        getCommand("portale").setTabCompleter(portalCmd);
 
         // Register listeners
         getServer().getPluginManager().registerEvents(new WandListener(this), this);
