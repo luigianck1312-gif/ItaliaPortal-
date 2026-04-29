@@ -14,16 +14,16 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 
 /**
- * Schema portale (WIDTH=4, HEIGHT=5):
+ * Schema IDENTICO al portale del Nether vanilla (4 largo x 5 alto):
  *
- *   [C][F][F][C]   top
+ *   [F][F][F][F]   <- top (cornice piena)
  *   [F][P][P][F]
- *   [A][P][P][A]
  *   [F][P][P][F]
- *   [C][F][F][C]   bottom
+ *   [F][P][P][F]
+ *   [F][F][F][F]   <- bottom (cornice piena)
  *
- * C=corner, F=frame/accent alternati, A=accent, P=NETHER_PORTAL
- * Il portale è orientato lungo X (asse X), cioè visibile da Nord/Sud.
+ * F = blocco cornice (1 blocco spessore su tutti i lati)
+ * P = NETHER_PORTAL
  */
 public class PortalBuilder {
 
@@ -32,11 +32,7 @@ public class PortalBuilder {
 
     public static void buildPortal(Location origin, PortalType type) {
         World world = origin.getWorld();
-
-        Material corner  = type.getCornerMaterial();
-        Material frame   = type.getFrameMaterial();
-        Material accent  = type.getAccentMaterial();
-        Material rare    = type.getRareMaterial();
+        Material frame = type.getCornerMaterial();
 
         for (int y = 0; y < HEIGHT; y++) {
             for (int x = 0; x < WIDTH; x++) {
@@ -45,25 +41,12 @@ public class PortalBuilder {
                         origin.getBlockY() + y,
                         origin.getBlockZ());
 
-                boolean isTop    = y == HEIGHT - 1;
-                boolean isBottom = y == 0;
-                boolean isLeft   = x == 0;
-                boolean isRight  = x == WIDTH - 1;
-                boolean isEdge   = isLeft || isRight;
-                boolean isHEdge  = isTop || isBottom;
-                boolean isCorner = isEdge && isHEdge;
-                boolean isInner  = !isEdge && !isHEdge;
+                boolean isEdgeX = (x == 0 || x == WIDTH - 1);
+                boolean isEdgeY = (y == 0 || y == HEIGHT - 1);
 
-                if (isCorner) {
-                    block.setType(corner);
-                } else if (isHEdge) {
-                    // top/bottom row: alterna frame e rare per un effetto carino
-                    block.setType(x == 1 ? frame : rare);
-                } else if (isEdge) {
-                    // lati: alterna frame e accent
-                    block.setType(y % 2 == 1 ? frame : accent);
-                } else if (isInner) {
-                    // interno: NETHER_PORTAL orientato lungo X
+                if (isEdgeX || isEdgeY) {
+                    block.setType(frame);
+                } else {
                     block.setType(Material.NETHER_PORTAL);
                     var bd = block.getBlockData();
                     if (bd instanceof Orientable orientable) {
@@ -78,7 +61,6 @@ public class PortalBuilder {
     }
 
     private static void placeSign(Location origin, PortalType type, World world) {
-        // cartello sopra al centro (x+1, y+HEIGHT)
         int sx = origin.getBlockX() + 1;
         int sy = origin.getBlockY() + HEIGHT;
         int sz = origin.getBlockZ();
@@ -101,9 +83,9 @@ public class PortalBuilder {
                 case END       -> NamedTextColor.LIGHT_PURPLE;
             };
             String label = switch (type) {
-                case OVERWORLD -> "✦ OVERWORLD ✦";
-                case NETHER    -> "✦ NETHER ✦";
-                case END       -> "✦  END  ✦";
+                case OVERWORLD -> "* OVERWORLD *";
+                case NETHER    -> "*  NETHER  *";
+                case END       -> "*    END    *";
             };
 
             front.line(0, Component.text(""));
@@ -123,7 +105,6 @@ public class PortalBuilder {
                         origin.getBlockZ()).setType(Material.AIR);
             }
         }
-        // rimuovi cartello
         world.getBlockAt(
                 origin.getBlockX() + 1,
                 origin.getBlockY() + height,

@@ -120,33 +120,45 @@ public class PortalManager {
     }
 
     private Location findSafeY(World world, int x, int z, PortalType type) {
-        // For The End, check if there's actually land (chunk must load first)
         Chunk chunk = world.getChunkAt(x >> 4, z >> 4);
         if (!chunk.isLoaded()) chunk.load();
 
         int minY = world.getMinHeight();
         int maxY = world.getMaxHeight() - 2;
 
-        // Scan from top down
         for (int y = maxY; y > minY; y--) {
-            Block block = world.getBlockAt(x, y, z);
-            Block blockAbove = world.getBlockAt(x, y + 1, z);
-            Block blockAbove2 = world.getBlockAt(x, y + 2, z);
+            Block ground      = world.getBlockAt(x, y, z);
+            Block standHere   = world.getBlockAt(x, y + 1, z);
+            Block headHere    = world.getBlockAt(x, y + 2, z);
 
-            if (!block.isPassable()
-                    && !isDangerous(block.getType())
-                    && blockAbove.isPassable()
-                    && blockAbove2.isPassable()
-                    && !isDangerous(blockAbove.getType())) {
+            // il blocco su cui stare in piedi deve essere solido e non pericoloso
+            if (ground.isPassable()) continue;
+            if (isDangerous(ground.getType())) continue;
 
-                // Extra check: not floating above void in End
-                if (type == PortalType.END && y < 40) continue;
+            // i 2 blocchi dove il giocatore si trova devono essere liberi e non acqua
+            if (!standHere.isPassable()) continue;
+            if (!headHere.isPassable()) continue;
+            if (isDangerousAir(standHere.getType())) continue;
+            if (isDangerousAir(headHere.getType())) continue;
 
-                return new Location(world, x + 0.5, y + 1, z + 0.5,
-                        0f, 0f);
-            }
+            // extra check End: non mandare in zone basse nel vuoto
+            if (type == PortalType.END && y < 40) continue;
+
+            return new Location(world, x + 0.5, y + 1, z + 0.5, 0f, 0f);
         }
         return null;
+    }
+
+    /** Blocchi che NON devono trovarsi nei 2 slot dove il giocatore si trova */
+    private boolean isDangerousAir(Material mat) {
+        return mat == Material.WATER
+            || mat == Material.LAVA
+            || mat == Material.FIRE
+            || mat == Material.KELP
+            || mat == Material.KELP_PLANT
+            || mat == Material.SEAGRASS
+            || mat == Material.TALL_SEAGRASS
+            || mat == Material.BUBBLE_COLUMN;
     }
 
     private boolean isDangerous(Material mat) {
@@ -155,7 +167,12 @@ public class PortalManager {
             || mat == Material.MAGMA_BLOCK
             || mat == Material.CACTUS
             || mat == Material.WITHER_ROSE
-            || mat == Material.SWEET_BERRY_BUSH;
+            || mat == Material.SWEET_BERRY_BUSH
+            || mat == Material.WATER
+            || mat == Material.KELP
+            || mat == Material.KELP_PLANT
+            || mat == Material.SEAGRASS
+            || mat == Material.TALL_SEAGRASS;
     }
 
     private void sendTeleportEffect(Player player, PortalType type) {
