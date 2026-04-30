@@ -2,23 +2,19 @@ name: SpawnPortals
 version: 1.0.0
 main: dev.spawnportals.SpawnPortals
 api-version: '1.21'
-description: Portali allo spawn per Overworld, Nether ed End con teletrasporto casuale
+description: Villager portali con ologramma per Overworld, Nether ed End
 authors: [SpawnPortals]
 
 commands:
   portale:
-    description: Gestisci i portali spawn
-    usage: |
-      /portale wand
-      /portale place <overworld|nether|end>
-      /portale remove <overworld|nether|end>
-      /portale list
+    description: Gestisci i villager portale
+    usage: /portale <spawn|remove|list> [overworld|nether|end]
     permission: spawnportals.admin
 
 permissions:
   spawnportals.admin:
-    description: Permesso per gestire i portali
+    description: Gestione portali
     default: op
   spawnportals.use:
-    description: Permesso per usare i portali
+    description: Usa i portali
     default: true

@@ -1,231 +1,289 @@
 package dev.spawnportals.managers;
 
 import dev.spawnportals.SpawnPortals;
-import dev.spawnportals.models.PortalRegion;
 import dev.spawnportals.models.PortalType;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.entity.Player;
+import org.bukkit.entity.*;
+import org.bukkit.event.player.PlayerTeleportEvent;
 
 import java.util.*;
 
 public class PortalManager {
 
     private final SpawnPortals plugin;
-    private final Map<PortalType, PortalRegion> portals = new HashMap<>();
+
+    // villagerUUID -> tipo portale
+    private final Map<UUID, PortalType> villagerMap = new HashMap<>();
+    // tipo -> UUID villager (per lookup inverso)
+    private final Map<PortalType, UUID> typeToVillager = new HashMap<>();
+    // tipo -> UUID armor stand ologramma (riga 1 = titolo, riga 2 = sottotitolo)
+    private final Map<PortalType, List<UUID>> holoStands = new HashMap<>();
+
     private final Map<UUID, Long> cooldowns = new HashMap<>();
 
     public PortalManager(SpawnPortals plugin) {
         this.plugin = plugin;
-        loadPortals();
     }
 
-    // ── Registration ──────────────────────────────────────────────────────────
+    // ── Spawn ────────────────────────────────────────────────────────────────
 
-    public void registerPortal(PortalRegion region) {
-        portals.put(region.getType(), region);
-        savePortals();
+    public void spawnPortalVillager(Location loc, PortalType type) {
+        World world = loc.getWorld();
+
+        // Rimuovi eventuale precedente
+        removePortalVillager(type);
+
+        // Spawna villager
+        Villager v = (Villager) world.spawnEntity(loc, EntityType.VILLAGER);
+        v.setCustomName("§8[§" + colorChar(type) + type.getId().toUpperCase() + "§8]");
+        v.setCustomNameVisible(false);
+        v.setAI(false);
+        v.setInvulnerable(true);
+        v.setSilent(true);
+        v.setVillagerType(villagerSkin(type));
+        v.setProfession(Villager.Profession.NONE);
+        v.setPersistent(true);
+
+        villagerMap.put(v.getUniqueId(), type);
+        typeToVillager.put(type, v.getUniqueId());
+
+        // Spawna ologrammi sopra
+        spawnHologram(loc, type, v.getUniqueId());
+
+        // Salva
+        saveVillager(type, v.getUniqueId(), loc);
     }
 
-    public void removePortal(PortalType type) {
-        portals.remove(type);
-        savePortals();
+    private void spawnHologram(Location baseLoc, PortalType type, UUID villagerUuid) {
+        World world = baseLoc.getWorld();
+        List<UUID> stands = new ArrayList<>();
+
+        // Riga 2 (più in basso): sottotitolo
+        ArmorStand as2 = spawnStand(world,
+                baseLoc.clone().add(0, 2.1, 0),
+                type.getHoloLine2());
+        stands.add(as2.getUniqueId());
+
+        // Riga 1 (più in alto): titolo colorato
+        ArmorStand as1 = spawnStand(world,
+                baseLoc.clone().add(0, 2.55, 0),
+                type.getHoloLine1());
+        stands.add(as1.getUniqueId());
+
+        holoStands.put(type, stands);
+
+        // Salva UUID stand nel config
+        plugin.getConfig().set("portals." + type.getId() + ".holo1", as1.getUniqueId().toString());
+        plugin.getConfig().set("portals." + type.getId() + ".holo2", as2.getUniqueId().toString());
+        plugin.saveConfig();
     }
 
-    public boolean hasPortal(PortalType type) {
-        return portals.containsKey(type);
+    private ArmorStand spawnStand(World world, Location loc, String name) {
+        ArmorStand as = (ArmorStand) world.spawnEntity(loc, EntityType.ARMOR_STAND);
+        as.setCustomName(name);
+        as.setCustomNameVisible(true);
+        as.setVisible(false);
+        as.setGravity(false);
+        as.setInvulnerable(true);
+        as.setSmall(true);
+        as.setSilent(true);
+        as.setPersistent(true);
+        as.setBasePlate(false);
+        as.setArms(false);
+        return as;
     }
 
-    public PortalRegion getPortal(PortalType type) {
-        return portals.get(type);
-    }
-
-    public Collection<PortalRegion> getAllPortals() {
-        return portals.values();
-    }
-
-    // ── Teleportation ─────────────────────────────────────────────────────────
-
-    public PortalType getPortalAt(Location loc) {
-        for (PortalRegion region : portals.values()) {
-            if (region.contains(loc)) return region.getType();
+    public void removePortalVillager(PortalType type) {
+        // Rimuovi villager
+        UUID vid = typeToVillager.remove(type);
+        if (vid != null) {
+            villagerMap.remove(vid);
+            findAndRemoveEntity(vid);
         }
-        return null;
+        // Rimuovi ologrammi
+        List<UUID> stands = holoStands.remove(type);
+        if (stands != null) {
+            for (UUID uid : stands) findAndRemoveEntity(uid);
+        }
+        plugin.getConfig().set("portals." + type.getId(), null);
+        plugin.saveConfig();
     }
+
+    private void findAndRemoveEntity(UUID uuid) {
+        for (World w : Bukkit.getWorlds()) {
+            for (Entity e : w.getEntities()) {
+                if (e.getUniqueId().equals(uuid)) {
+                    e.remove();
+                    return;
+                }
+            }
+        }
+    }
+
+    // ── Lookup ───────────────────────────────────────────────────────────────
+
+    public PortalType getTypeByVillager(UUID uuid) {
+        return villagerMap.get(uuid);
+    }
+
+    public boolean isPortalVillager(UUID uuid) {
+        return villagerMap.containsKey(uuid);
+    }
+
+    // ── Teleport ─────────────────────────────────────────────────────────────
 
     public boolean isOnCooldown(Player player) {
-        long cooldownMs = plugin.getConfig().getLong("settings.teleport-cooldown", 5) * 1000L;
-        long last = cooldowns.getOrDefault(player.getUniqueId(), 0L);
-        return (System.currentTimeMillis() - last) < cooldownMs;
+        long cd = plugin.getConfig().getLong("settings.teleport-cooldown", 5) * 1000L;
+        return System.currentTimeMillis() - cooldowns.getOrDefault(player.getUniqueId(), 0L) < cd;
     }
 
     public long getRemainingCooldown(Player player) {
-        long cooldownMs = plugin.getConfig().getLong("settings.teleport-cooldown", 5) * 1000L;
-        long last = cooldowns.getOrDefault(player.getUniqueId(), 0L);
-        long remaining = cooldownMs - (System.currentTimeMillis() - last);
-        return Math.max(0, remaining / 1000);
+        long cd = plugin.getConfig().getLong("settings.teleport-cooldown", 5) * 1000L;
+        return Math.max(0, (cd - (System.currentTimeMillis() - cooldowns.getOrDefault(player.getUniqueId(), 0L))) / 1000);
     }
 
     public void teleportPlayer(Player player, PortalType type) {
-        World targetWorld = getWorldForType(type);
-        if (targetWorld == null) {
+        World target = getWorldForType(type);
+        if (target == null) {
             player.sendMessage(color("&cIl mondo di destinazione non esiste!"));
             return;
         }
 
         cooldowns.put(player.getUniqueId(), System.currentTimeMillis());
 
-        String msg = plugin.getConfig().getString("messages.teleporting", "&aTeletrasporto in corso verso %world%...")
-                .replace("%world%", type.getDisplayName());
+        String msg = plugin.getConfig().getString("messages.teleporting", "&aTeletrasporto verso &e%world%&a...")
+                .replace("%world%", type.getId().toUpperCase());
         player.sendMessage(color(msg));
 
-        // Run async safe-spot search
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            Location safe = findSafeLocation(targetWorld, type);
-            if (safe == null) {
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    player.sendMessage(color(plugin.getConfig().getString(
-                            "messages.safe-spot-not-found", "&cNon riesco a trovare un posto sicuro, riprova!")));
-                });
-                return;
-            }
+            Location safe = findSafe(target, type);
             Bukkit.getScheduler().runTask(plugin, () -> {
-                player.teleport(safe);
-                sendTeleportEffect(player, type);
+                if (safe == null) {
+                    player.sendMessage(color(plugin.getConfig().getString(
+                            "messages.safe-spot-not-found", "&cPosto sicuro non trovato, riprova!")));
+                    return;
+                }
+                player.teleport(safe, PlayerTeleportEvent.TeleportCause.PLUGIN);
+                player.spawnParticle(Particle.PORTAL, player.getLocation().add(0,1,0), 60);
+                player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
             });
         });
     }
 
     private World getWorldForType(PortalType type) {
-        for (World w : Bukkit.getWorlds()) {
+        for (World w : Bukkit.getWorlds())
             if (w.getEnvironment() == type.getTargetEnvironment()) return w;
-        }
         return null;
     }
 
-    private Location findSafeLocation(World world, PortalType type) {
+    private Location findSafe(World world, PortalType type) {
         int range = (int) plugin.getConfig().getLong("settings.teleport-range", 30000);
-        int maxAttempts = (int) plugin.getConfig().getLong("settings.max-safe-attempts", 50);
-        Random random = new Random();
+        int attempts = (int) plugin.getConfig().getLong("settings.max-safe-attempts", 50);
+        Random rnd = new Random();
 
-        for (int attempt = 0; attempt < maxAttempts; attempt++) {
-            int x = random.nextInt(range * 2) - range;
-            int z = random.nextInt(range * 2) - range;
-
-            Location candidate = findSafeY(world, x, z, type);
-            if (candidate != null) return candidate;
+        for (int i = 0; i < attempts; i++) {
+            int x = rnd.nextInt(range * 2) - range;
+            int z = rnd.nextInt(range * 2) - range;
+            Location loc = findSafeY(world, x, z, type);
+            if (loc != null) return loc;
         }
         return null;
     }
 
     private Location findSafeY(World world, int x, int z, PortalType type) {
-        Chunk chunk = world.getChunkAt(x >> 4, z >> 4);
-        if (!chunk.isLoaded()) chunk.load();
+        if (!world.getChunkAt(x >> 4, z >> 4).isLoaded())
+            world.getChunkAt(x >> 4, z >> 4).load();
 
-        int minY = world.getMinHeight();
-        int maxY = world.getMaxHeight() - 2;
+        for (int y = world.getMaxHeight() - 2; y > world.getMinHeight(); y--) {
+            Block ground  = world.getBlockAt(x, y, z);
+            Block stand1  = world.getBlockAt(x, y + 1, z);
+            Block stand2  = world.getBlockAt(x, y + 2, z);
 
-        for (int y = maxY; y > minY; y--) {
-            Block ground      = world.getBlockAt(x, y, z);
-            Block standHere   = world.getBlockAt(x, y + 1, z);
-            Block headHere    = world.getBlockAt(x, y + 2, z);
-
-            // il blocco su cui stare in piedi deve essere solido e non pericoloso
             if (ground.isPassable()) continue;
             if (isDangerous(ground.getType())) continue;
-
-            // i 2 blocchi dove il giocatore si trova devono essere liberi e non acqua
-            if (!standHere.isPassable()) continue;
-            if (!headHere.isPassable()) continue;
-            if (isDangerousAir(standHere.getType())) continue;
-            if (isDangerousAir(headHere.getType())) continue;
-
-            // extra check End: non mandare in zone basse nel vuoto
+            if (!stand1.isPassable()) continue;
+            if (!stand2.isPassable()) continue;
+            if (isUnsafeAir(stand1.getType())) continue;
+            if (isUnsafeAir(stand2.getType())) continue;
             if (type == PortalType.END && y < 40) continue;
 
-            return new Location(world, x + 0.5, y + 1, z + 0.5, 0f, 0f);
+            return new Location(world, x + 0.5, y + 1, z + 0.5);
         }
         return null;
     }
 
-    /** Blocchi che NON devono trovarsi nei 2 slot dove il giocatore si trova */
-    private boolean isDangerousAir(Material mat) {
-        return mat == Material.WATER
-            || mat == Material.LAVA
-            || mat == Material.FIRE
-            || mat == Material.KELP
-            || mat == Material.KELP_PLANT
-            || mat == Material.SEAGRASS
-            || mat == Material.TALL_SEAGRASS
-            || mat == Material.BUBBLE_COLUMN;
+    private boolean isDangerous(Material m) {
+        return m == Material.LAVA || m == Material.MAGMA_BLOCK || m == Material.FIRE
+            || m == Material.CACTUS || m == Material.WITHER_ROSE || m == Material.SWEET_BERRY_BUSH;
     }
 
-    private boolean isDangerous(Material mat) {
-        return mat == Material.LAVA
-            || mat == Material.FIRE
-            || mat == Material.MAGMA_BLOCK
-            || mat == Material.CACTUS
-            || mat == Material.WITHER_ROSE
-            || mat == Material.SWEET_BERRY_BUSH
-            || mat == Material.WATER
-            || mat == Material.KELP
-            || mat == Material.KELP_PLANT
-            || mat == Material.SEAGRASS
-            || mat == Material.TALL_SEAGRASS;
-    }
-
-    private void sendTeleportEffect(Player player, PortalType type) {
-        Color particleColor = switch (type) {
-            case OVERWORLD -> Color.LIME;
-            case NETHER -> Color.RED;
-            case END -> Color.GRAY;
-        };
-        player.spawnParticle(Particle.DUST,
-                player.getLocation().add(0, 1, 0),
-                40,
-                new Particle.DustOptions(particleColor, 1.5f));
-        player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
+    private boolean isUnsafeAir(Material m) {
+        return m == Material.WATER || m == Material.LAVA || m == Material.FIRE
+            || m == Material.KELP || m == Material.KELP_PLANT
+            || m == Material.SEAGRASS || m == Material.TALL_SEAGRASS
+            || m == Material.BUBBLE_COLUMN;
     }
 
     // ── Persistence ───────────────────────────────────────────────────────────
 
-    private void savePortals() {
-        plugin.getConfig().set("portals", null);
-        for (PortalRegion r : portals.values()) {
-            String key = "portals." + r.getType().getId();
-            plugin.getConfig().set(key + ".world", r.getWorldName());
-            plugin.getConfig().set(key + ".minX", r.getMinX());
-            plugin.getConfig().set(key + ".minY", r.getMinY());
-            plugin.getConfig().set(key + ".minZ", r.getMinZ());
-            plugin.getConfig().set(key + ".maxX", r.getMaxX());
-            plugin.getConfig().set(key + ".maxY", r.getMaxY());
-            plugin.getConfig().set(key + ".maxZ", r.getMaxZ());
+    public void loadAll() {
+        ConfigurationSection sec = plugin.getConfig().getConfigurationSection("portals");
+        if (sec == null) return;
+
+        for (String key : sec.getKeys(false)) {
+            PortalType type = PortalType.fromString(key);
+            if (type == null) continue;
+
+            String vidStr   = sec.getString(key + ".villager");
+            String holo1Str = sec.getString(key + ".holo1");
+            String holo2Str = sec.getString(key + ".holo2");
+            if (vidStr == null) continue;
+
+            UUID vid = UUID.fromString(vidStr);
+            villagerMap.put(vid, type);
+            typeToVillager.put(type, vid);
+
+            List<UUID> stands = new ArrayList<>();
+            if (holo1Str != null) stands.add(UUID.fromString(holo1Str));
+            if (holo2Str != null) stands.add(UUID.fromString(holo2Str));
+            holoStands.put(type, stands);
         }
+        plugin.getLogger().info("Caricati " + typeToVillager.size() + " portali villager.");
+    }
+
+    private void saveVillager(PortalType type, UUID villagerUuid, Location loc) {
+        String base = "portals." + type.getId();
+        plugin.getConfig().set(base + ".villager", villagerUuid.toString());
+        plugin.getConfig().set(base + ".world", loc.getWorld().getName());
+        plugin.getConfig().set(base + ".x", loc.getX());
+        plugin.getConfig().set(base + ".y", loc.getY());
+        plugin.getConfig().set(base + ".z", loc.getZ());
         plugin.saveConfig();
     }
 
-    private void loadPortals() {
-        ConfigurationSection section = plugin.getConfig().getConfigurationSection("portals");
-        if (section == null) return;
-        for (String key : section.getKeys(false)) {
-            PortalType type = PortalType.fromString(key);
-            if (type == null) continue;
-            String world = section.getString(key + ".world");
-            int minX = section.getInt(key + ".minX");
-            int minY = section.getInt(key + ".minY");
-            int minZ = section.getInt(key + ".minZ");
-            int maxX = section.getInt(key + ".maxX");
-            int maxY = section.getInt(key + ".maxY");
-            int maxZ = section.getInt(key + ".maxZ");
-            portals.put(type, new PortalRegion(type, world, minX, minY, minZ, maxX, maxY, maxZ));
-        }
-        plugin.getLogger().info("Caricati " + portals.size() + " portali.");
+    // ── Util ─────────────────────────────────────────────────────────────────
+
+    private char colorChar(PortalType type) {
+        return switch (type) {
+            case OVERWORLD -> 'a';
+            case NETHER    -> 'c';
+            case END       -> 'd';
+        };
     }
 
-    // ── Utils ─────────────────────────────────────────────────────────────────
+    private Villager.Type villagerSkin(PortalType type) {
+        return switch (type) {
+            case OVERWORLD -> Villager.Type.PLAINS;
+            case NETHER    -> Villager.Type.SAVANNA;
+            case END       -> Villager.Type.SNOW;
+        };
+    }
 
     public static String color(String s) {
         return ChatColor.translateAlternateColorCodes('&', s);
     }
+
+    public Map<PortalType, UUID> getTypeToVillager() { return typeToVillager; }
 }
