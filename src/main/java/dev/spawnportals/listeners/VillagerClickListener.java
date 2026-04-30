@@ -1,0 +1,45 @@
+package dev.spawnportals.listeners;
+
+import dev.spawnportals.SpawnPortals;
+import dev.spawnportals.managers.PortalManager;
+import dev.spawnportals.models.PortalType;
+import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
+import org.bukkit.inventory.EquipmentSlot;
+
+public class VillagerClickListener implements Listener {
+
+    private final SpawnPortals plugin;
+    private final PortalManager portalManager;
+
+    public VillagerClickListener(SpawnPortals plugin) {
+        this.plugin = plugin;
+        this.portalManager = plugin.getPortalManager();
+    }
+
+    @EventHandler
+    public void onInteract(PlayerInteractEntityEvent event) {
+        if (event.getHand() == EquipmentSlot.OFF_HAND) return;
+        if (event.getRightClicked().getType() != EntityType.VILLAGER) return;
+        if (!portalManager.isPortalVillager(event.getRightClicked().getUniqueId())) return;
+
+        event.setCancelled(true);
+
+        Player player = event.getPlayer();
+        if (!player.hasPermission("spawnportals.use")) return;
+
+        PortalType type = portalManager.getTypeByVillager(event.getRightClicked().getUniqueId());
+
+        if (portalManager.isOnCooldown(player)) {
+            player.sendMessage(PortalManager.color(
+                plugin.getConfig().getString("messages.cooldown", "&cAspetta ancora &e%seconds%s&c!")
+                .replace("%seconds%", String.valueOf(portalManager.getRemainingCooldown(player)))));
+            return;
+        }
+
+        portalManager.teleportPlayer(player, type);
+    }
+}
