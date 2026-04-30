@@ -37,7 +37,6 @@ public class PortalCommand implements CommandExecutor, TabCompleter {
             player.sendMessage(PortalManager.color("&cNon hai il permesso!"));
             return true;
         }
-
         if (args.length == 0) { sendHelp(player); return true; }
 
         switch (args[0].toLowerCase()) {
@@ -52,7 +51,7 @@ public class PortalCommand implements CommandExecutor, TabCompleter {
     private void sendHelp(Player p) {
         p.sendMessage(PortalManager.color("&6=== SpawnPortals ==="));
         p.sendMessage(PortalManager.color("&e/portale spawn <overworld|nether|end> &7- Spawna il villager portale dove sei"));
-        p.sendMessage(PortalManager.color("&e/portale remove <overworld|nether|end> &7- Rimuovi villager portale"));
+        p.sendMessage(PortalManager.color("&e/portale remove <overworld|nether|end> &7- Rimuovi il villager portale"));
         p.sendMessage(PortalManager.color("&e/portale list &7- Lista portali attivi"));
     }
 
@@ -67,7 +66,7 @@ public class PortalCommand implements CommandExecutor, TabCompleter {
             return;
         }
         portalManager.spawnPortalVillager(player.getLocation(), type);
-        player.sendMessage(PortalManager.color("&aVillager &e" + type.getId().toUpperCase() + " &aspirato!"));
+        player.sendMessage(PortalManager.color("&aVillager &e" + type.getId().toUpperCase() + " &aspawnato!"));
     }
 
     private void handleRemove(Player player, String[] args) {
@@ -91,10 +90,8 @@ public class PortalCommand implements CommandExecutor, TabCompleter {
             return;
         }
         player.sendMessage(PortalManager.color("&6=== Villager Portali Attivi ==="));
-        for (var entry : map.entrySet()) {
-            player.sendMessage(PortalManager.color(
-                "&a" + entry.getKey().getId().toUpperCase() + " &7→ " + entry.getValue()));
-        }
+        for (var entry : map.entrySet())
+            player.sendMessage(PortalManager.color("&a" + entry.getKey().getId().toUpperCase() + " &7\u2192 UUID: " + entry.getValue()));
     }
 
     @Override

@@ -28,16 +28,17 @@ public class VillagerClickListener implements Listener {
         var uuid = event.getRightClicked().getUniqueId();
         if (!portalManager.isPortalVillager(uuid)) return;
 
-        event.setCancelled(true); // niente GUI villager
+        event.setCancelled(true);
 
         Player player = event.getPlayer();
+        if (!player.hasPermission("spawnportals.use")) return;
+
         PortalType type = portalManager.getTypeByVillager(uuid);
 
         if (portalManager.isOnCooldown(player)) {
             long rem = portalManager.getRemainingCooldown(player);
             player.sendMessage(PortalManager.color(
-                plugin.getConfig().getString("messages.cooldown",
-                    "&cAspetta ancora &e%seconds%s&c!")
+                plugin.getConfig().getString("messages.cooldown", "&cAspetta ancora &e%seconds%s&c!")
                 .replace("%seconds%", String.valueOf(rem))));
             return;
         }

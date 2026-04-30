@@ -16,7 +16,7 @@ public class SpawnPortals extends JavaPlugin {
 
         this.portalManager = new PortalManager(this);
 
-        // Carica i villager salvati (dopo che il mondo è caricato)
+        // Carica i villager salvati 1 tick dopo (mondo gia' caricato)
         getServer().getScheduler().runTaskLater(this, () -> portalManager.loadAll(), 20L);
 
         // Comandi
