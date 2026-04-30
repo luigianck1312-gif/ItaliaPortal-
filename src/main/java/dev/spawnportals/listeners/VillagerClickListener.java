@@ -24,22 +24,19 @@ public class VillagerClickListener implements Listener {
     public void onInteract(PlayerInteractEntityEvent event) {
         if (event.getHand() == EquipmentSlot.OFF_HAND) return;
         if (event.getRightClicked().getType() != EntityType.VILLAGER) return;
-
-        var uuid = event.getRightClicked().getUniqueId();
-        if (!portalManager.isPortalVillager(uuid)) return;
+        if (!portalManager.isPortalVillager(event.getRightClicked().getUniqueId())) return;
 
         event.setCancelled(true);
 
         Player player = event.getPlayer();
         if (!player.hasPermission("spawnportals.use")) return;
 
-        PortalType type = portalManager.getTypeByVillager(uuid);
+        PortalType type = portalManager.getTypeByVillager(event.getRightClicked().getUniqueId());
 
         if (portalManager.isOnCooldown(player)) {
-            long rem = portalManager.getRemainingCooldown(player);
             player.sendMessage(PortalManager.color(
                 plugin.getConfig().getString("messages.cooldown", "&cAspetta ancora &e%seconds%s&c!")
-                .replace("%seconds%", String.valueOf(rem))));
+                .replace("%seconds%", String.valueOf(portalManager.getRemainingCooldown(player)))));
             return;
         }
 

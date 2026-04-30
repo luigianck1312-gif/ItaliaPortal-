@@ -38,7 +38,6 @@ public class PortalCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args.length == 0) { sendHelp(player); return true; }
-
         switch (args[0].toLowerCase()) {
             case "spawn"  -> handleSpawn(player, args);
             case "remove" -> handleRemove(player, args);
@@ -50,48 +49,33 @@ public class PortalCommand implements CommandExecutor, TabCompleter {
 
     private void sendHelp(Player p) {
         p.sendMessage(PortalManager.color("&6=== SpawnPortals ==="));
-        p.sendMessage(PortalManager.color("&e/portale spawn <overworld|nether|end> &7- Spawna il villager portale dove sei"));
-        p.sendMessage(PortalManager.color("&e/portale remove <overworld|nether|end> &7- Rimuovi il villager portale"));
+        p.sendMessage(PortalManager.color("&e/portale spawn <overworld|nether|end> &7- Spawna villager dove sei"));
+        p.sendMessage(PortalManager.color("&e/portale remove <overworld|nether|end> &7- Rimuovi villager"));
         p.sendMessage(PortalManager.color("&e/portale list &7- Lista portali attivi"));
     }
 
     private void handleSpawn(Player player, String[] args) {
-        if (args.length < 2) {
-            player.sendMessage(PortalManager.color("&cUso: /portale spawn <overworld|nether|end>"));
-            return;
-        }
+        if (args.length < 2) { player.sendMessage(PortalManager.color("&cUso: /portale spawn <overworld|nether|end>")); return; }
         PortalType type = PortalType.fromString(args[1]);
-        if (type == null) {
-            player.sendMessage(PortalManager.color("&cTipo non valido! Usa: overworld, nether, end"));
-            return;
-        }
+        if (type == null) { player.sendMessage(PortalManager.color("&cTipo non valido!")); return; }
         portalManager.spawnPortalVillager(player.getLocation(), type);
         player.sendMessage(PortalManager.color("&aVillager &e" + type.getId().toUpperCase() + " &aspawnato!"));
     }
 
     private void handleRemove(Player player, String[] args) {
-        if (args.length < 2) {
-            player.sendMessage(PortalManager.color("&cUso: /portale remove <overworld|nether|end>"));
-            return;
-        }
+        if (args.length < 2) { player.sendMessage(PortalManager.color("&cUso: /portale remove <overworld|nether|end>")); return; }
         PortalType type = PortalType.fromString(args[1]);
-        if (type == null) {
-            player.sendMessage(PortalManager.color("&cTipo non valido! Usa: overworld, nether, end"));
-            return;
-        }
+        if (type == null) { player.sendMessage(PortalManager.color("&cTipo non valido!")); return; }
         portalManager.removePortalVillager(type);
         player.sendMessage(PortalManager.color("&cVillager &e" + type.getId().toUpperCase() + " &crimosso!"));
     }
 
     private void handleList(Player player) {
         var map = portalManager.getTypeToVillager();
-        if (map.isEmpty()) {
-            player.sendMessage(PortalManager.color("&eNessun villager portale attivo."));
-            return;
-        }
-        player.sendMessage(PortalManager.color("&6=== Villager Portali Attivi ==="));
-        for (var entry : map.entrySet())
-            player.sendMessage(PortalManager.color("&a" + entry.getKey().getId().toUpperCase() + " &7\u2192 UUID: " + entry.getValue()));
+        if (map.isEmpty()) { player.sendMessage(PortalManager.color("&eNessun portale attivo.")); return; }
+        player.sendMessage(PortalManager.color("&6=== Portali Attivi ==="));
+        for (var e : map.entrySet())
+            player.sendMessage(PortalManager.color("&a" + e.getKey().getId().toUpperCase() + " &7\u2192 " + e.getValue()));
     }
 
     @Override

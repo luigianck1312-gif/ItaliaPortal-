@@ -2,10 +2,8 @@ settings:
   teleport-range: 30000
   teleport-cooldown: 5
   max-safe-attempts: 50
-
 messages:
   teleporting: "&aTeletrasporto verso &e%world%&a..."
   safe-spot-not-found: "&cPosto sicuro non trovato, riprova!"
   cooldown: "&cAspetta ancora &e%seconds%s&c!"
-
 portals: {}

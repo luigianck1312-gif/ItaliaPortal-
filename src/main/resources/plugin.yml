@@ -2,15 +2,13 @@ name: SpawnPortals
 version: 1.0.0
 main: dev.spawnportals.SpawnPortals
 api-version: '1.21'
-description: Villager portali con ologramma per Overworld, Nether ed End
+description: Villager portali con ologramma
 authors: [SpawnPortals]
-
 commands:
   portale:
     description: Gestisci i villager portale
     usage: /portale <spawn|remove|list> [overworld|nether|end]
     permission: spawnportals.admin
-
 permissions:
   spawnportals.admin:
     description: Gestione portali
